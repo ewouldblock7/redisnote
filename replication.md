@@ -16,14 +16,10 @@ master端replication流程。
 2. 如果bgsave正在进行，并且有一个slave状态为REDIS_REPL_WAIT_BGSAVE_END， 则将该slave状态改为REDIS_REPL_WAIT_BGSAVE_END， 否则，状态为REDIS_REPL_WAIT_BGSAVE_START。
 3. 如果bgsave不是正在进行的状态，则启动rdbSaveBackground。并将slave状态改为REDIS_REPL_WAIT_BGSAVE_END。
 4. 将salve添加到server.slaves中。
-* * *
-------------------------------------以下是后台进程处理----------------------------
-5. 在master的serverCron中，如果判断到server.rdb_child_pid != -1， 则非阻塞的wait子进程.如果wait的返回pid == server.rdb_child_pid. 则进行backgroundSaveDoneHandler。
-6. 在backgroundSaveDoneHandler中， 会进行updateSlavesWaitingBgsave。
-7. updateSlavesWaitingBgsave则将那些状态为REDIS_REPL_WAIT_BGSAVE_END的slave创建非阻塞异步的写事件。
-8. 7步骤中写事件通过sendBulkToSlave回调，sendBulkToSlave将master的rdb内容分多次同步给slave。
-------------------------------------后台进程处理结束----------------------------
-* * *
+5. （后台进程处理）在master的serverCron中，如果判断到server.rdb_child_pid != -1， 则非阻塞的wait子进程.如果wait的返回pid == server.rdb_child_pid. 则进行backgroundSaveDoneHandler。
+6. （后台进程处理）在backgroundSaveDoneHandler中， 会进行updateSlavesWaitingBgsave。
+7. （后台进程处理）updateSlavesWaitingBgsave则将那些状态为REDIS_REPL_WAIT_BGSAVE_END的slave创建非阻塞异步的写事件。
+8. （后台进程处理）7步骤中写事件通过sendBulkToSlave回调，sendBulkToSlave将master的rdb内容分多次同步给slave。
 9. 同步期间，master端的修改均通过processInputBuffer（） -> processCommand() -> call() ->propagate() -> replicationFeedSlaves() 来写到客户端的buf里（redisClient->buf）。当8步骤同步完成时，即已经完成的大小和dump的rdb大小一致时，将同步期间master端的修改再次发送给slave。
 
 
