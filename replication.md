@@ -23,5 +23,15 @@ master端replication流程。
 9. 同步期间，master端的修改均通过processInputBuffer（） -> processCommand() -> call() ->propagate() -> replicationFeedSlaves() 来写到客户端的buf里（redisClient->buf）。当8步骤同步完成时，即已经完成的大小和dump的rdb大小一致时，将同步期间master端的修改再次发送给slave。
 
 
+2.8 Partial Replication的几个点
+=============
++ 首先partial replication存在于一个成功的replication后。初次replication若不成功，随后的重新replication会是full replication.
++ master端通过一个backlog来实现增量同步。backlog是一个环形队列，因此只能保存最近min(repl_backlog_size,实际长度）的增量数据。因此slave端的reploff必须在这个增量数据范围内才能满足增量传输。
++ 对于slave端传上来的reploff,当满足上一条中的数据范围时，还需计算出需同步的一个数据字节的位置。
++ slave端通过cached_master缓存了master信息。这一步是replicationCron时检测到master超时，进而freeclient时判断到时master,进而replicationCacheMaster。下一次尝试增量同步时就是利用cached_master缓存的master id.
++ master通过initServerConfig()中getRandomHexChars来生成masterid. getRandomHexChars是通过/dev/urandom来生成随机数的。
++ 增量同步时并不是像全量同步时新建个tmp.rdb，来append。而是通过replicationResurrectCachedMaster()中注册的readQueryFromClient回调来更新数据。
+
+
 
 
